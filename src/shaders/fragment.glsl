@@ -94,7 +94,7 @@ void main() {
 
   vec3 ldir = normalize(vec3(1.0, 0.5, 0.0));
 
-  float shd = softshadow(p + normal*0.01, ldir, 0.01, length(vec3(1.0, 0.5, 0.0)-p), 1.0);
+  float shd = softshadow(p + normal*0.01, ldir, 0.01, length(vec3(1.0, 0.5, 0.0)-p), 1.0) - 0.5;
 
   vec3 sky = vec3(0.74, 0.9, 1.0);
   Material color = Material(sky, 1.0, TRUE, 1.0);

@@ -13,3 +13,4 @@ float softshadow( in vec3 ro, in vec3 rd, float mint, float maxt, float w )
   res = max(res,-1.0);
   return 0.25*(1.0+res)*(1.0+res)*(2.0-res);
 }
+
