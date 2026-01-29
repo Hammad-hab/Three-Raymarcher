@@ -2,25 +2,35 @@ precision highp float;
 
 uniform sampler2D tDiffuse;
 
-#define MAX_STEPS 1000.0
-#define MAX_DIST 100000.0
+#define MAX_STEPS 256.0
+#define MAX_DIST 300.0
 #define EPS 0.0001
-#define SHADOW_RES 1024
+#define SHADOW_RES 256
 #define WORLD_AMBIENT_INTENSITY 0.5
 #define TRUE 1.0
 #define FALSE 0.0
+#define MAX_SPHERES 32
+#define PI 3.1415926535
 
 varying vec2 vUv;
 uniform float uTime;
+
+/* ---- CHANGED (same name, now array) ---- */
+uniform int uSphereCount;
+uniform vec3 uSpherePos[MAX_SPHERES];
+
 uniform vec2 iResolution;
 uniform vec3 cpos;
 uniform vec3 cdir;
 uniform mat4 matrixWorld;
 varying vec3 fragPosition;
-
+varying mat3 vNormalMat;
+uniform sampler2D img;
+uniform sampler2D tDepth;
 
 $import sdf.glsl $
 $import material.glsl $
+
 
 vec2 smin(vec2 a, vec2 b, float k) {
     float h = max(k - abs(a.x - b.x), 0.0) / k;
@@ -29,50 +39,39 @@ vec2 smin(vec2 a, vec2 b, float k) {
     return vec2(dist, matID);
 }
 
+/* ---------- SCENE ---------- */
 vec2 scene(vec3 p) {
-  float box = sdBox(p-vec3(0.0, 2.0*sin(uTime*0.5), 0.0), vec3(1.0, 1.0, 1.0));
-  float plane = sdBox(p+vec3(0.0, 2.25, 0.0), vec3(100.0, 1.0, 100.0));
-  float sphere = sdfSphere(p-vec3(0.0, 3.0*sin(uTime*0.1), 0.0), 1.2);
-  // Return closest object with its material ID
-  vec2 res = vec2(box, 1.0);  // Start with box
-  
-  if (plane < res.x) {
-    res = vec2(plane, 2.0);  // Only update if plane is closer
-  }
+  vec2 res = vec2(1.0, 2.0);
 
-  if (sphere < res.x) {
-    res = vec2(sphere, 1.0);  // Only update if plane is closer
-  }
-  return smin(smin(vec2(plane, 2.0),vec2(sphere, 1.0), 1.0),vec2(box, 1.0), 1.0);
+  $ scene.glsl $
+  return res;
 }
 
-// Wrapper for shadow/normal calculations that only need distance
+/* Wrapper for shadow/normal calculations */
 float sceneDistance(vec3 p) {
   return scene(p).x;
 }
 
 $import shadow.glsl $
 
-
 vec2 raymarch(vec3 origin, vec3 dir) {
   float travelled = 0.0;
-  float matID = -1.0;
+ float matID = -1.0;
 
-  for (float i = 0.0; i < MAX_STEPS; i+=1.0) {
-    vec3 p = origin + dir*travelled;
+  for (float i = 0.0; i < MAX_STEPS; i += 1.0) {
+    vec3 p = origin + dir * travelled;
     vec2 res = scene(p);
-    float dist = res.x*0.9;
-    travelled += max(dist, 0.001); 
+    float dist = res.x * 0.9;
+    travelled += max(dist, 0.001);
 
-    if (travelled > MAX_DIST || dist < 0.001) {
+    if (travelled > MAX_DIST || dist < 0.01) {
       matID = res.y;
       break;
     }
   }
 
-  return vec2(travelled, matID);
+ return vec2(travelled, matID);
 }
-
 
 void main() {
   vec2 uv = vUv - 0.5;
@@ -99,7 +98,7 @@ void main() {
   vec3 sky = vec3(0.74, 0.9, 1.0);
   Material color = Material(sky, 1.0, TRUE, 1.0);
 
-  Material red = Material(vec3(1.0, 0.0, 0.0), 1.0, FALSE, 5.0);
+  Material red = Material(vec3(1.0), 1.0, FALSE, 5.0);
   registerMaterial(red, 1);
 
   Material white = Material((step(fract(0.1*vec3(p.x)), vec3(0.9)) - step(fract(0.1*vec3(p.z)), vec3(0.1))), 1.0, FALSE, 0.0);
@@ -117,7 +116,7 @@ void main() {
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 4.0);
     vec3 specular = color.specularStrength * spec * color.color;  
   float diff = max(dot(ldir, normal), 0.0)*shd*color.lightMultiplier;
-  vec3 finalColor = (color.color)*(color.ignoreLighting == 1.0 ? vec3(1.0) : (WORLD_AMBIENT_INTENSITY + vec3(diff) + specular));
+  vec3 finalColor = (color.color)*(color.ignoreLighting == 1.0 ? vec3(1.0) : (WORLD_AMBIENT_INTENSITY + vec3(diff)));
 
 
   float totalColorContent = smoothstep(0.0, 1.0, finalColor.r + finalColor.g + finalColor.b); 
